@@ -150,7 +150,7 @@ app.get('/:shortCode', async (req, res) => {
   }
 });
 
-app.get('/demo', async(res,res)=>{
+app.get('/demo', async(req,res)=>{
    setTimeout(()=>{
       return res.json({
         success:true,
