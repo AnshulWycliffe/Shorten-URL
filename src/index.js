@@ -16,7 +16,7 @@ app.use(express.json());
 app.use(cors()); // Allow cross-origin requests
 app.use(express.static('public')); // Serve static files
 
-
+const path = require('path');
 // Initialize Firebase
 const firebaseConfig = {
   apiKey: process.env.API_KEY,
@@ -159,6 +159,11 @@ app.get("/demo", async(req,res)=>{
       })
    }, 11000);
 });
+
+app.get("/test", (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+});
+
 
 // Start the server
 app.listen(port, () => {
