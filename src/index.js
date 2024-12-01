@@ -16,6 +16,7 @@ app.use(express.json());
 app.use(cors()); // Allow cross-origin requests
 app.use(express.static('public')); // Serve static files
 
+
 // Initialize Firebase
 const firebaseConfig = {
   apiKey: process.env.API_KEY,
