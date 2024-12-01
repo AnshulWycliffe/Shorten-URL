@@ -9,7 +9,7 @@ const { getFirestore, collection, addDoc, getDocs, query, where, getDoc, doc } =
 
 // Create Express app
 const app = express();
-const port = process.env.PORT || 3000;
+const port = 3000;
 
 // Middleware
 app.use(express.json());
