@@ -150,6 +150,15 @@ app.get('/:shortCode', async (req, res) => {
   }
 });
 
+app.get('/demo', async(res,res)=>{
+   setTimeout(()=>{
+      return res.json({
+        success:true,
+        message:"Hello World",
+      })
+   }, 11000);
+});
+
 // Start the server
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
