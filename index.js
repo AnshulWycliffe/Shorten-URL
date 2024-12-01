@@ -1,15 +1,20 @@
 // Load environment variables
 require('dotenv').config();
 
-// Import necessary Firebase modules
-const { initializeApp } = require('firebase/app');
-const { getFirestore, collection, addDoc, getDocs } = require('firebase/firestore');
+// Import necessary modules
 const express = require('express');
-const app = express();
-const port = 3000;
+const cors = require('cors');
+const { initializeApp } = require('firebase/app');
+const { getFirestore, collection, addDoc, getDocs, query, where, getDoc, doc } = require('firebase/firestore');
 
-// Middleware to parse JSON requests
+// Create Express app
+const app = express();
+const port = process.env.PORT || 3000;
+
+// Middleware
 app.use(express.json());
+app.use(cors()); // Allow cross-origin requests
+app.use(express.static('public')); // Serve static files
 
 // Initialize Firebase
 const firebaseConfig = {
@@ -23,11 +28,24 @@ const firebaseConfig = {
   measurementId: process.env.MEASUREMENT_ID,
 };
 
-const firebaseApp = initializeApp(firebaseConfig);
-const db = getFirestore(firebaseApp);
+let db;
+try {
+  const firebaseApp = initializeApp(firebaseConfig);
+  db = getFirestore(firebaseApp);
+  console.log("Firebase initialized");
+} catch (error) {
+  console.error("Firebase initialization failed:", error);
+}
 
-// Serve the frontend files (static)
-app.use(express.static('public'));
+// Helper function to validate URLs
+function isValidURL(url) {
+  try {
+    new URL(url);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
 
 // Function to generate a short code (random string of 6 characters)
 function generateShortCode() {
@@ -37,66 +55,102 @@ function generateShortCode() {
 // Store the original URL and its corresponding short code in Firestore
 async function createShortURL(originalURL) {
   const shortCode = generateShortCode();
-  
+
   // Check if the short code already exists
-  const existingShortCode = await checkShortCode(shortCode);
-  if (existingShortCode) {
-    return createShortURL(originalURL);  // Regenerate if it exists
+  const shortCodeExists = await checkShortCode(shortCode);
+  if (shortCodeExists) {
+    return createShortURL(originalURL); // Regenerate if it exists
   }
 
-  const docRef = await addDoc(collection(db, 'shortenedURLs'), {
-    originalURL,
-    shortCode,
-  });
-
-  return shortCode;
+  try {
+    await addDoc(collection(db, 'shortenedURLs'), {
+      originalURL,
+      shortCode,
+    });
+    return shortCode;
+  } catch (error) {
+    console.error("Error adding document:", error);
+    throw new Error("Failed to create short URL");
+  }
 }
 
 // Check if the generated short code already exists
 async function checkShortCode(shortCode) {
-  const querySnapshot = await getDocs(collection(db, 'shortenedURLs'));
-  return querySnapshot.docs.some(doc => doc.data().shortCode === shortCode);
+  try {
+    const shortCodeQuery = query(
+      collection(db, 'shortenedURLs'),
+      where('shortCode', '==', shortCode)
+    );
+    const querySnapshot = await getDocs(shortCodeQuery);
+    return !querySnapshot.empty;
+  } catch (error) {
+    console.error("Error checking short code:", error);
+    throw new Error("Failed to check short code");
+  }
 }
 
 // Retrieve original URL by short code
 async function getOriginalURL(shortCode) {
-  const querySnapshot = await getDocs(collection(db, 'shortenedURLs'));
-  const found = querySnapshot.docs.find(doc => doc.data().shortCode === shortCode);
+  try {
+    const shortCodeQuery = query(
+      collection(db, 'shortenedURLs'),
+      where('shortCode', '==', shortCode)
+    );
+    const querySnapshot = await getDocs(shortCodeQuery);
 
-  if (found) {
-    return found.data().originalURL;
-  } else {
-    return null;  // Short code not found
+    if (!querySnapshot.empty) {
+      const doc = querySnapshot.docs[0];
+      return doc.data().originalURL;
+    }
+    return null; // Short code not found
+  } catch (error) {
+    console.error("Error retrieving original URL:", error);
+    throw new Error("Failed to retrieve original URL");
   }
 }
 
 // POST endpoint to shorten URL
 app.post('/shorten', async (req, res) => {
   const { originalURL } = req.body;
-  if (!originalURL) {
-    return res.status(400).json({ success: false, message: 'URL is required' });
+
+  // Validate the URL
+  if (!originalURL || !isValidURL(originalURL)) {
+    return res
+      .status(400)
+      .json({ success: false, message: 'A valid URL is required' });
   }
 
-  // Create a shortened URL
-  const shortCode = await createShortURL(originalURL);
+  try {
+    // Create a shortened URL
+    const shortCode = await createShortURL(originalURL);
 
-  // Respond with the short code
-  res.json({ success: true, shortCode });
+    // Respond with the short code
+    res.json({ success: true, shortCode });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, message: 'Failed to shorten URL' });
+  }
 });
 
 // Redirect user based on the short code
 app.get('/:shortCode', async (req, res) => {
   const shortCode = req.params.shortCode;
-  const originalURL = await getOriginalURL(shortCode);
-  
-  if (originalURL) {
-    res.redirect(originalURL);  // Redirect to the original URL
-  } else {
-    res.status(404).send('URL not found');
+
+  try {
+    const originalURL = await getOriginalURL(shortCode);
+
+    if (originalURL) {
+      res.redirect(originalURL); // Redirect to the original URL
+    } else {
+      res.status(404).send('URL not found');
+    }
+  } catch (error) {
+    res.status(500).send('Failed to retrieve the URL');
   }
 });
 
-// Start the Express server
+// Start the server
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
