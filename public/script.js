@@ -35,3 +35,13 @@ if (data.success) {
     alert('Failed to shorten the URL. Please try again.');
   }
 });
+
+
+document.getElementById('copyButton').addEventListener('click', function () {
+  const shortenedUrl = document.getElementById('shortenedUrl').href;
+  navigator.clipboard.writeText(shortenedUrl).then(() => {
+    alert('Shortened URL copied to clipboard!');
+  }).catch(err => {
+    alert('Failed to copy URL: ' + err);
+  });
+});
